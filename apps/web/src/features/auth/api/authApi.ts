@@ -1,4 +1,4 @@
-import httpService from '../services/httpService';
+import httpService from '../../../services/httpService';
 
 export const authApi = {
   register: (email: string, password: string) =>
@@ -9,4 +9,3 @@ export const authApi = {
 
   me: () => httpService.get<{ id: number; email: string }>('/auth/me'),
 };
-

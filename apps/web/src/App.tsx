@@ -1,64 +1,41 @@
-import { useEffect, useRef } from 'react';
-import { BrowserRouter, Routes, Route, Navigate } from 'react-router-dom';
-import { useAuthStore } from './context/authStore';
-import { LoginPage } from './pages/LoginPage';
-import { DashboardPage } from './pages/DashboardPage';
+import { createBrowserRouter, RouterProvider } from 'react-router-dom';
+import { GlobalLoading } from './components/GlobalLoading';
+import { rootRoute } from './routes/root';
+import { indexRoute, wildcardRoute } from './routes/index';
+import { loginRoute } from './routes/login';
+import { dashboardRoute } from './routes/dashboard';
+import { usersListRoute } from './routes/users';
+import { AppShellLayout } from './layouts/AppShellLayout';
+import { PrivateRoute, requireAuth } from './components/RoutesGuards';
+import { hydrateUserIfNeeded } from './routes/root';
 
-function PrivateRoute({ children }: { children: React.ReactNode }) {
-  const { user } = useAuthStore();
-  return user ? <>{children}</> : <Navigate to="/login" replace />;
+async function protectedShellLoader() {
+  const state = await hydrateUserIfNeeded();
+  return requireAuth(state);
 }
 
-function PublicRoute({ children }: { children: React.ReactNode }) {
-  const { user } = useAuthStore();
-  return user ? <Navigate to="/dashboard" replace /> : <>{children}</>;
-}
+const router = createBrowserRouter([
+  {
+    ...rootRoute,
+    children: [
+      indexRoute,
+      loginRoute,
+      {
+        element: (
+          <PrivateRoute>
+            <AppShellLayout />
+          </PrivateRoute>
+        ),
+        loader: protectedShellLoader,
+        children: [dashboardRoute, usersListRoute],
+      },
+      wildcardRoute,
+    ],
+  },
+]);
 
 function App() {
-  const { user, token, fetchMe, isLoading } = useAuthStore();
-  const fetchMeRef = useRef(fetchMe);
-  fetchMeRef.current = fetchMe;
-
-  useEffect(() => {
-    if (token && !user) {
-      fetchMeRef.current();
-    }
-  }, [token, user]);
-
-  if (isLoading) {
-    return (
-      <div className="min-h-screen flex items-center justify-center bg-gray-50">
-        <div className="flex flex-col items-center gap-3">
-          <div className="w-10 h-10 border-4 border-indigo-500 border-t-transparent rounded-full animate-spin" />
-          <p className="text-gray-500 text-sm">Loading…</p>
-        </div>
-      </div>
-    );
-  }
-
-  return (
-    <BrowserRouter>
-      <Routes>
-        <Route
-          path="/login"
-          element={
-            <PublicRoute>
-              <LoginPage />
-            </PublicRoute>
-          }
-        />
-        <Route
-          path="/dashboard"
-          element={
-            <PrivateRoute>
-              <DashboardPage />
-            </PrivateRoute>
-          }
-        />
-        <Route path="*" element={<Navigate to={user ? '/dashboard' : '/login'} replace />} />
-      </Routes>
-    </BrowserRouter>
-  );
+  return <RouterProvider router={router} fallbackElement={<GlobalLoading label="Booting app..." />} />;
 }
 
 export default App;
